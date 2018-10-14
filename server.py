@@ -98,6 +98,8 @@ class ClientThread(Thread):
     def run(self):
         while True:
             command = self.sock.recv(BUFFER_SIZE)
+            print(command)
+            
 
 
 
