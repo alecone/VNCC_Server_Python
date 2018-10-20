@@ -9,7 +9,7 @@ import configparser
 from shutil import rmtree
 
 
-TCP_IP = 'localhost'
+TCP_IP = '192.168.0.18'#'localhost' #socket.gethostname() # '192.168.0.18'
 TCP_PORT = 9001
 BUFFER_SIZE = 1024
 
@@ -263,6 +263,11 @@ class ClientThread(Thread):
         self.sock.send(OK.encode())
         to_remove = self.sock.recv(BUFFER_SIZE)
         to_remove = to_remove.decode('utf-8')
+        # Check if the user want to destry it's cloud
+        if to_remove == self.user_path:
+            self.sock.send(NOK.encode())
+            print('Action disabled for now')
+            return
         if '.' in to_remove:
             # Search file and remove
             for file in os.walk(self.user_path):
@@ -375,10 +380,10 @@ if __name__== "__main__":
         tcpsock.bind((ip, port))
         while True:
             tcpsock.listen(5)
-            print ("Waiting for incoming connections... on IP/PORT = ", TCP_IP, "/", TCP_PORT)
-            (conn, (ip,port)) = tcpsock.accept()
-            print('Got connection from ', ip, ', ',port)
-            new_client = ClientThread(ip,port,conn)
+            print ("Waiting for incoming connections... on IP/PORT = ", ip, "/", port)
+            (conn, (ip_client,port_client)) = tcpsock.accept()
+            print('Got connection from ', ip_client, ', ',port_client)
+            new_client = ClientThread(ip_client, port_client, conn)
             new_client.start()
             threads.append(new_client)
             if off:
