@@ -29,37 +29,43 @@ TREE = 'GETTREEVIEW'
 ND = 'NEWDIR'
 DISCONNECT = 'DISCONNECT'
 
+
 def MENU():
     print('1.  Start Server')
     print('2.  Show Clients Connected')
     print('3.  Stop Server')
     print('\r\nq.  Quit ')
 
+
 USERS = {}
+
 
 class ClientThread(Thread):
 
     ''' Handler when the client connection is succesfull '''
-    def __init__(self,ip,port,sock):
+
+    def __init__(self, ip, port, sock):
         Thread.__init__(self)
         self.ip = ip
         self.port = port
         self.sock = sock
-        print ("New ClientThread started for ",ip,":",str(port))
+        print("New ClientThread started for ", ip, ":", str(port))
         self.user_path = ""
         self.created_dir = 1
 
     ''' Method that return json file of tree view'''
+
     def path_to_dict(self, path):
         d = {'name': os.path.basename(path)}
         if os.path.isdir(path):
             d['type'] = "directory"
-            d['children'] = [self.path_to_dict(os.path.join(path,x)) for x in os.listdir(path)]
+            d['children'] = [self.path_to_dict(os.path.join(path, x)) for x in os.listdir(path)]
         else:
             d['type'] = "file"
         return d
 
     ''' Register Command Received '''
+
     def register_user(self):
         print('REGISTER')
         # Tell user OK, send me data
@@ -121,6 +127,7 @@ class ClientThread(Thread):
             self.sock.send(REGNOK.encode())
 
     ''' Login Command Received '''
+
     def login_user(self):
         print('LOGIN')
         # Tell user OK, send me data
@@ -173,12 +180,14 @@ class ClientThread(Thread):
             self.sock.send(REGNOK.encode())
 
     ''' Method that send the tree view to the client '''
+
     def set_tree_view(self):
         print('TREE')
         to_send = json.dumps(self.path_to_dict(self.user_path))
         self.sock.send(to_send.encode())
 
     ''' Method for download the file '''
+
     def download(self):
         print('DOWNLOAD')
         self.sock.send(OK.encode())
@@ -205,6 +214,7 @@ class ClientThread(Thread):
                 print('Finished to transfer file')
 
     ''' Method for upload the file '''
+
     def upload(self):
         print('UPLOAD')
         self.sock.send(OK.encode())
@@ -258,6 +268,7 @@ class ClientThread(Thread):
 
 
     ''' Method for remove the file '''
+
     def remove(self):
         print('REMOVE')
         self.sock.send(OK.encode())
@@ -293,6 +304,7 @@ class ClientThread(Thread):
             self.sock.send(NOK.encode())
 
     ''' Method for create new dir '''
+
     def new_dir(self):
         print('NEW_DIR')
         self.sock.send(OK.encode())
@@ -342,6 +354,7 @@ class ClientThread(Thread):
 
 
     ''' Main run. Client Commands dispatcher '''
+
     def run(self):
         while keep_client_alive:
             command = self.sock.recv(BUFFER_SIZE)
@@ -366,7 +379,7 @@ class ClientThread(Thread):
         print('Client stopped')
 
 
-if __name__== "__main__":
+if __name__ == "__main__":
 
     threads = []
 
@@ -380,8 +393,8 @@ if __name__== "__main__":
         tcpsock.bind((ip, port))
         while True:
             tcpsock.listen(5)
-            print ("Waiting for incoming connections... on IP/PORT = ", ip, "/", port)
-            (conn, (ip_client,port_client)) = tcpsock.accept()
+            print("Waiting for incoming connections... on IP/PORT = ", ip, "/", port)
+            (conn, (ip_client, port_client)) = tcpsock.accept()
             print('Got connection from ', ip_client, ', ',port_client)
             new_client = ClientThread(ip_client, port_client, conn)
             new_client.start()
@@ -393,6 +406,8 @@ if __name__== "__main__":
         print('Socket disconnection from server')
 
     def stop_server():
+        global keep_client_alive
+        global off
         print('Closing clients from server')
         keep_client_alive = False
         for client in threads:
