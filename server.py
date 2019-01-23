@@ -9,7 +9,7 @@ import configparser
 from shutil import rmtree
 
 
-TCP_IP = '192.168.0.18'#'localhost' #socket.gethostname() # '192.168.0.18'
+TCP_IP = 'localhost'#'localhost' #socket.gethostname() # '192.168.0.18'
 TCP_PORT = 9001
 BUFFER_SIZE = 1024
 
