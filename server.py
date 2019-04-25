@@ -1,5 +1,6 @@
 import socket
 from threading import Thread
+import multiprocessing
 from socketserver import ThreadingMixIn
 import os
 import json
@@ -7,6 +8,7 @@ import sys
 import errno
 import configparser
 from shutil import rmtree
+from time import time
 
 
 TCP_IP = 'localhost'#'localhost' #socket.gethostname() # '192.168.0.18'
@@ -31,6 +33,7 @@ DISCONNECT = 'DISCONNECT'
 
 
 def MENU():
+    print('\r\n\r\n')
     print('1.  Start Server')
     print('2.  Show Clients Connected')
     print('3.  Stop Server')
@@ -52,6 +55,7 @@ class ClientThread(Thread):
         print("New ClientThread started for ", ip, ":", str(port))
         self.user_path = ""
         self.created_dir = 1
+        self.running = True
 
     ''' Method that return json file of tree view'''
 
@@ -275,7 +279,7 @@ class ClientThread(Thread):
         to_remove = self.sock.recv(BUFFER_SIZE)
         to_remove = to_remove.decode('utf-8')
         # Check if the user want to destry it's cloud
-        if to_remove == self.user_path:
+        if to_remove == self.user_path.split('/')[-1]:
             self.sock.send(NOK.encode())
             print('Action disabled for now')
             return
@@ -294,7 +298,7 @@ class ClientThread(Thread):
                     full_file = root + '/' + to_remove
                     break
             else:
-                print('Non ho trovato il cartell0')
+                print('Non ho trovato la cartella')
             rmtree(full_file)
             check_remove = os.path.isdir(full_file)
         if not check_remove:
@@ -356,7 +360,8 @@ class ClientThread(Thread):
     ''' Main run. Client Commands dispatcher '''
 
     def run(self):
-        while keep_client_alive:
+        global keep_client_alive
+        while keep_client_alive and self.running:
             command = self.sock.recv(BUFFER_SIZE)
             command_string = command.decode('utf-8')
             if command_string == REG:
@@ -375,46 +380,50 @@ class ClientThread(Thread):
                 self.new_dir()
             elif command_string == DISCONNECT:
                 print('DISCONNECTION Req from client')
-                break
+                self.running = False
         print('Client stopped')
 
 
 if __name__ == "__main__":
 
+    # Globals variables
+    on = True
+    keep_client_alive = True
+
     threads = []
 
     def show_clients():
-        for client in threads:
-            print(client)
+        print(threads)
 
     def start_server(ip, port):
+        global on
         tcpsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         tcpsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         tcpsock.bind((ip, port))
-        while True:
-            tcpsock.listen(5)
+        while on:
+            tcpsock.listen(0)
             print("Waiting for incoming connections... on IP/PORT = ", ip, "/", port)
             (conn, (ip_client, port_client)) = tcpsock.accept()
             print('Got connection from ', ip_client, ', ',port_client)
             new_client = ClientThread(ip_client, port_client, conn)
             new_client.start()
             threads.append(new_client)
-            if off:
-                break
         print('Shutting down socket')
         tcpsock.shutdown(socket.SHUT_WR)
         print('Socket disconnection from server')
+        tcpsock.close()
+
 
     def stop_server():
+        global on
         global keep_client_alive
-        global off
         print('Closing clients from server')
         keep_client_alive = False
         for client in threads:
             print('Joining thread')
             client.join()
         print('Clients closed')
-        off = True
+        on = False
 
     started = False
     cfg = configparser.ConfigParser()
@@ -425,16 +434,18 @@ if __name__ == "__main__":
             for user in cfg['USERS']:
                 USERS.update({user: cfg['USERS'][user]})
 
+    MENU()
     while True:
-        MENU()
         ans = input()
         if ans == '1':
             if not started:
-                off = False
+                on = True
                 keep_client_alive = True
-                main_thread = Thread(target=start_server, args=(TCP_IP, TCP_PORT,))
-                main_thread.start()
-                # start_server(TCP_IP, TCP_PORT)
+                # main_thread = Thread(target=start_server, args=(TCP_IP, TCP_PORT,))
+                # main_thread.start()
+                main_thread = multiprocessing.Process(
+                    target=start_server, args=(TCP_IP, TCP_PORT,))
+                main_thread.start()     
                 started = True
             else:
                 print('Server is already running')
@@ -443,9 +454,11 @@ if __name__ == "__main__":
         elif ans == '3':
             if started:
                 stop_server()
-                main_thread.join()
+                main_thread.terminate()
                 started = False
             else:
                 print('Server is not running')
         elif ans == 'q':
             break
+        else:
+            MENU()
