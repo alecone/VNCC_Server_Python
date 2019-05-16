@@ -239,7 +239,7 @@ class ClientThread(Thread):
         if upload_dest_dir == self.user_path.split('/')[-1]:
             full_file = upload_dest_dir
         else:
-            for root, dir, file in os.walk(self.user_path):
+            for root, dir in os.walk(self.user_path):
                 if upload_dest_dir in dir:
                     full_file = root + '/' + upload_dest_dir
                     break
@@ -320,7 +320,7 @@ class ClientThread(Thread):
         if where_to_create == self.user_path.split('/')[-1]:
             full_dir_path = where_to_create
         else:
-            for root, dir, file in os.walk(self.user_path):
+            for root, dir in os.walk(self.user_path):
                 if where_to_create in dir:
                     full_dir_path = root + '/' + where_to_create
                     break
