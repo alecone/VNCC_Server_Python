@@ -13,7 +13,7 @@ import subprocess as sp
 
 mypass = ''
 
-TCP_IP = '172.20.10.14'  # 'localhost' #socket.gethostname() # '192.168.0.18'
+TCP_IP = '172.20.10.13'  # 'localhost' #socket.gethostname() # '192.168.0.18'
 TCP_PORT = 9001
 BUFFER_SIZE = 1024
 
@@ -78,6 +78,7 @@ class ClientThread(Thread):
                         stdout=sp.PIPE, stderr=sp.PIPE)
         proc.stdin.write(bytes(mypass + '\n', 'utf-8'))
         (o, e) = proc.communicate()
+        print(o)
         print(e)
         return (o, e)
 
@@ -86,19 +87,18 @@ class ClientThread(Thread):
 
         ''' Method that return json file of tree view'''
 
-        # Avoid to show los+found dir
-        if 'lost+found' in path:
-            print('Skipping lost*+found dir !')
-            pass
-        else:
-            d={'name': os.path.basename(path)}
-            if os.path.isdir(path):
-                d['type']="directory"
-                d['children']=[self.path_to_dict(
-                    os.path.join(path, x)) for x in os.listdir(path)]
+        d={'name': os.path.basename(path)}
+        if os.path.isdir(path):
+            d['type']="directory"
+            # Avoid to show los+found dir
+            if os.path.basename(path) == 'lost+found':
+                print('Skipping lost*+found dir !')
             else:
-                d['type']="file"
-            return d
+                d['children'] = [self.path_to_dict(
+                    os.path.join(path, x)) for x in os.listdir(path)]
+        else:
+            d['type']="file"
+        return d
 
 
     def register_user(self):
@@ -161,7 +161,8 @@ class ClientThread(Thread):
                 if ret == NOK:
                     self.sock.send(REGNOK.encode())
                 else:
-                    self.user_path=dir_name
+                    self.user_path = ret
+                    print('Registration OK, sendig OK. User path is ', self.user_path)
                     self.sock.send(REGOK.encode())
                 # self.sock.send(REGOK.encode())
                 # End of registration, Now user can Log IN
@@ -311,8 +312,8 @@ class ClientThread(Thread):
         if upload_dest_dir == self.user_path.split('/')[-1]:
             full_file=self.user_path
         else:
-            for root, dir in os.walk(self.user_path):
-                if upload_dest_dir in dir:
+            for root, dirs, files in os.walk(self.user_path):
+                if upload_dest_dir in dirs:
                     full_file=root + '/' + upload_dest_dir
                     break
             else:
@@ -461,13 +462,13 @@ class ClientThread(Thread):
                 # Once the volume is attached, create FileSystem and mount it under the new
                 # dir created with the name of the user
                 if len(disks) > 0:
-                    sleep(6)
                     o, e=self.sudo(DISK_LIST)
                     while disks[0].encode() not in o:
                         print('Waiting for disk to be seen by server...')
                         o, e = self.sudo(DISK_LIST)
                     print("Going to format disk ", disks[0])
                     self.sudo(FORMAT_DISK + [disks[0]])
+                    dir_path = '/' + dir_path
                     print("Going to mount ", disks[0], " on mount point ", dir_path)
                     sleep(2)
                     self.sudo(MOUNT_DISK + [disks[0], dir_path])
@@ -478,7 +479,7 @@ class ClientThread(Thread):
                         if sec == 'DISKS':
                             for disco in cfg['DISKS']:
                                 if disco == disks[0]:
-                                    cfg.set('DISKS', disco, '1')
+                                    cfg.set('DISKS', disco, dir_path)
                     with open('server_config.cfg', 'w') as configfile:
                         cfg.write(configfile)
 
