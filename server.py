@@ -37,6 +37,7 @@ CREATE_VOLUME = 'VOLUME_CREATE'
 DISK_LIST = ['fdisk', '-l']
 FORMAT_DISK = ['mkfs', '-t', 'ext2']
 MOUNT_DISK = ['mount']
+UMOUNT_DISK = ['umount']
 
 # This has to be moved into config file
 # as it has to ramain stored even if the server goes down
@@ -495,6 +496,17 @@ class ClientThread(Thread):
                 return NOK
         else:
             return NOK
+
+
+    def logout(self):
+
+        ''' Log out method to be invoked when client close the application.
+            Simply just unmount disk from user path
+        '''
+
+        # Unmount disk
+        self.sudo(UMOUNT_DISK + [self.disk, self.user_path])
+        # End of Log OUT
 
 
 
