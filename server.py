@@ -534,6 +534,7 @@ class ClientThread(Thread):
                 self.new_dir()
             elif command_string == DISCONNECT:
                 print('DISCONNECTION Req from client')
+                self.logout()
                 self.running=False
         print('Client stopped')
 
