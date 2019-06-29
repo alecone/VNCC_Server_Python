@@ -13,14 +13,16 @@ CREATE_VOLUME = 'VOLUME_CREATE'
 DELETE_VOLUME = 'VOLUME_DELETE'
 SERVER_ID = ""
 OK = 'OK'
+NOK = 'NOK'
 
 volumes = {}
 
 # Grant access to cinder API with OS_VARS
-cinder = client.Client('admin','alecone','admin','http://controller:35357/v3')
+cinder = client.Client('admin', 'alecone', 'admin',
+                       'http://controller:35357/v3')
 nova = novaclient.Client(2, 'admin', 'alecone', 'admin',
                          auth_url='http://controller:35357/v3')
-
+INSTANCE_ID = ''
 
 
 # In order to see all methods availeble open a shell import client class
@@ -37,7 +39,7 @@ class Cindarello():
         network and since the controller is not exposed it would be an issue to 
         reach it. 
     '''
-    
+
     def __init__(self, sock):
         self.sock = sock
         self.sock.connect((TCP_IP, 9001))
@@ -46,7 +48,6 @@ class Cindarello():
         print('Cinderello UP')
 
     def sudo(self, command):
-        
         ''' sudo command executer '''
 
         proc = sp.Popen(['sudo', '-kS'] + command, stdin=sp.PIPE,
@@ -57,7 +58,6 @@ class Cindarello():
         print(e)
 
     def create_volume(self):
-
         ''' Main volume creator and attachator '''
 
         print('CREATE AND ATTACH VOLUME COMMAND RECEIVED')
@@ -67,48 +67,63 @@ class Cindarello():
         name = name.decode('utf-8')
         print('Volume name is ', name)
 
+        # send ok to server
+        self.sock.send(OK.encode())
+        disk = self.sock.recv(BUFFER_SIZE)
+        disk = disk.decode('utf-8')
+
         # Creating a VolumeManager object -> volume
-        current_volume = self.cinder.volumes.create(size=1,name=name,availability_zone='nova')
-        sleep(2)
+        current_volume = self.cinder.volumes.create(
+            size=1, name=name, availability_zone='nova')
 
         print(current_volume.name)
-
 
         # per vedere se tutto va bene salva in una var res = ...
         # poi fai il check on res[0].status_code == 202
 
-        # cinder.volumes.reserve(current_volume)
-        # connector = {
-        #     'ip': '10.0.0.31',
-        #     'initiator': None???,
-        #     'host': 'aleCompute1'
-        # }
-        # cinder.volumes.initialize_connection(current_volume, connector)
-        # cinder.volumes.attach(current_volume,INSTANCE_ID, '/dev/sdb')
+        res = self.cinder.volumes.reserve(current_volume)
+        if res[0].status_code == 202:
 
-        # Attaching volume using nova api since with cinder doesn't work
+            ''' The connector parameter is very important 
+                I took this reference in order to know how the cinder api actually
+                translate the REST call cinder attach, which is not that easy.
+                I faces a lot of problem searching which are the parameter of the connection dict
+                Finally I got that it has to be with ip, initiator and host
+                Now the problem was to find the initiator, seemed to be impossible..but then
+                surfing within the openstack source code with command grep -r initiator .
+                i found a file in /openstack/os_brick/initiator/connector.py that list the initiator entry
+                for every driver supporte. As my case is iSCSI i chose my and magically worked
+            '''
 
-        # Popen since api does not provide add_volume method
-        # Sourcing admin_openrc
+            connector = {
+                'ip': '10.0.0.31',
+                'initiator': 'os_brick.initiator.connectors.iscsi.ISCSIConnector',
+                'host': 'aleCompute1'
+            }
 
-        # Call openstack commands
-        proc = sp.Popen(['openstack', 'server', 'add', 'volume', 'UniPgDrive', current_volume.name])
-        proc.wait()
+            driver = self.cinder.volumes.initialize_connection(
+                current_volume, connector)
+            print(driver)
+            self.cinder.volumes.attach(current_volume, INSTANCE_ID, disk)
 
-        # Add volume to dict like user_name: volume_obj
+            # # Call openstack commands
+            # proc = sp.Popen(['openstack', 'server', 'add', 'volume', 'UniPgDrive', current_volume.name])
+            # proc.wait()
 
-        # Return OK
-        self.sock.send(OK.encode())
-        
+            # Add volume to dict like user_name: volume_obj
 
-
+            # Return OK
+            self.sock.send(OK.encode())
+        else:
+            self.sock.send(NOK.encode())
 
     def delete_volume(self):
-
         ''' Main volume detachtor and distroier '''
 
-        print('DETACH AND DELETE VOLUME COMMAND RECEIVED')
-        # cinder.volumes.delete()
+        # res = self.cinder.volumes.begin_detaching(volume)
+        # self.cinder.volumes.terminate_connection(volume, self.connector)
+        # self.cinder.volumes.detach(...)
+        # self.cinder.volumes.delete(volume)
 
     def run(self):
 
@@ -123,12 +138,8 @@ class Cindarello():
                 print('Unsupported request')
 
 
-
 if __name__ == "__main__":
 
     sock = socket.socket()
     cinder = Cindarello(sock)
     cinder.run()
-
-
-
